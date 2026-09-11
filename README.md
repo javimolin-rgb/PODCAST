@@ -1,58 +1,96 @@
-# Podcast Studio Local — TTS para estudiar
+# Podcast Studio — GitHub Pages + API
 
-Aplicación local para convertir textos largos en podcasts de estudio sin depender de APIs de pago.
+Aplicación web para convertir documentos de estudio en podcasts.
 
-## Motor recomendado
+## Arquitectura
 
-**Kokoro-82M** es el motor principal porque tiene buen equilibrio entre calidad, velocidad y tamaño, licencia Apache-2.0 y un catálogo amplio de voces. El proyecto expone las voces oficiales del modelo.
+- `frontend/`: aplicación estática desplegable en GitHub Pages.
+- `backend/`: API FastAPI desplegable en Render, Railway, Fly.io, Cloud Run, etc.
+- TTS principal: ElevenLabs mediante API (configurable).
+- TTS alternativo: cualquier endpoint compatible con Kokoro mediante `KOKORO_API_URL`.
+- Las claves nunca van al frontend.
 
-Incluye:
-- 54 voces Kokoro.
-- Español: `ef_dora` y `em_alex` / `em_santa`.
-- Perfiles de narración: Estudio, Podcast, Cátedra, Conversacional, Energético, Calmado y Repaso.
-- Segmentación inteligente de textos largos.
-- Pausas naturales.
-- Control de velocidad.
-- Exportación WAV.
-- Cola de capítulos.
-- Importación TXT, MD, PDF y DOCX (PDF/DOCX requieren las dependencias indicadas).
-
-## Instalación
-
-Recomendado: Python 3.11 o 3.12.
+## 1. Backend local
 
 ```bash
-cd podcast-studio
-python -m venv .venv
+cd backend
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python scripts/download_models.py
-python app/server.py
+cp .env.example .env
+# Edita .env y agrega tu API key
+uvicorn main:app --reload --port 8000
 ```
 
-Luego abre:
-http://127.0.0.1:8765
+## 2. Frontend local
 
-La primera descarga de Kokoro requiere internet. Después el modelo y las voces quedan almacenados localmente.
+Desde la carpeta raíz:
 
-## macOS Apple Silicon
+```bash
+python3 -m http.server 5500 --directory frontend
+```
 
-PyTorch puede usar MPS cuando está disponible. Si MPS da problemas, la app cae a CPU.
+Abre `http://localhost:5500`.
 
-## Modelos
+En el frontend, configura temporalmente:
 
-### Kokoro — incluido como motor principal
-Apache-2.0. Catálogo de voces en:
-https://huggingface.co/hexgrad/Kokoro-82M
+```js
+window.PODCAST_API_URL = "http://localhost:8000";
+```
 
-### Piper — fallback rápido
-MIT para el software, pero **cada voz puede tener su propia licencia**. La aplicación deja el mecanismo preparado para añadir voces Piper y leer su MODEL_CARD antes de habilitarlas.
+También puede definirse en `frontend/config.js`.
 
-### Chatterbox / F5-TTS — opcionales
-No se instalan automáticamente porque sus pesos tienen condiciones de licencia distintas. Chatterbox es MIT en la implementación consultada; F5-TTS tiene código MIT pero pesos CC-BY-NC. Si el uso pasa a ser comercial, revisa las licencias antes de incorporarlos.
+## 3. GitHub Pages
 
-## Importante sobre "todas las voces"
+Sube el contenido de `frontend/` a GitHub Pages.
 
-La app no copia indiscriminadamente voces de terceros. Descarga las voces oficiales de Kokoro y muestra sus metadatos/licencia. También permite añadir modelos compatibles posteriormente.
+La API NO debe publicarse en GitHub Pages.
 
-Para estudiar, la configuración inicial recomienda voces con ritmo estable y claridad antes que una voz extremadamente expresiva.
+Edita `frontend/config.js`:
+
+```js
+window.PODCAST_API_URL = "https://TU-BACKEND.onrender.com";
+```
+
+## 4. Deploy del backend
+
+El backend incluye `Dockerfile` y puede desplegarse en cualquier servicio que soporte Docker.
+
+Variables mínimas:
+
+- `ELEVENLABS_API_KEY`
+- `ELEVENLABS_MODEL_ID` (opcional)
+- `ALLOWED_ORIGINS` — separa varios dominios con comas
+
+Opcional:
+
+- `KOKORO_API_URL`
+- `KOKORO_API_KEY`
+- `MAX_UPLOAD_MB`
+- `MAX_CHARS`
+
+## Importante
+
+GitHub Pages es sólo frontend. Nunca pongas `ELEVENLABS_API_KEY` en JavaScript del navegador.
+
+## Funciones
+
+- PDF, DOCX, TXT, Markdown
+- pegar texto
+- extracción de texto
+- limpieza
+- segmentación inteligente
+- capítulos
+- perfiles de narración
+- voces configurables
+- velocidad
+- generación por segmentos
+- progreso en tiempo real
+- reproductor por capítulos
+- descarga de MP3
+- API REST
+- proveedor TTS intercambiable
+
+## Licencias
+
+Kokoro y sus voces deben mantenerse sujetos a sus licencias oficiales. Este proyecto no redistribuye automáticamente modelos de terceros.

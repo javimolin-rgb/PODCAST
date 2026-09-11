@@ -30,10 +30,18 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
+      - name: Prepare frontend
+        run: |
+          mkdir -p dist
+          cp frontend/index.html dist/index.html
+          cp frontend/app.js dist/app.js
+          cp frontend/config.js dist/config.js
+          cp frontend/styles.css dist/styles.css
+
       - name: Upload frontend
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './frontend'
+          path: './dist'
 
       - name: Deploy to GitHub Pages
         id: deployment

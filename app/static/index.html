@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Podcast Studio — estudio por audio</title>
+<style>
+:root{--bg:#f5f4f0;--card:#fff;--ink:#171717;--muted:#777;--line:#e6e3dc;--accent:#5b46e8}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif}
+header{padding:34px 7vw 20px;display:flex;justify-content:space-between;align-items:end}h1{font-size:32px;margin:0 0 5px;letter-spacing:-1.2px}header p{margin:0;color:var(--muted)}
+.badge{padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:white;font-size:12px}
+main{max-width:1180px;margin:auto;padding:20px 7vw 70px;display:grid;grid-template-columns:1.2fr .8fr;gap:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 8px 30px #00000008}
+.drop{border:1.5px dashed #cfcac0;border-radius:17px;padding:28px;text-align:center;cursor:pointer;background:#faf9f6}
+textarea{width:100%;min-height:430px;border:1px solid var(--line);border-radius:16px;padding:18px;font:15px/1.65 inherit;resize:vertical;outline:none}
+label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#666;display:block;margin:18px 0 8px}
+select,input[type=range]{width:100%}select{padding:12px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.profile{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.profile button{border:1px solid var(--line);background:white;border-radius:12px;padding:11px;text-align:left;cursor:pointer}.profile button.active{border-color:var(--accent);box-shadow:0 0 0 2px #5b46e81a}
+button.primary{width:100%;margin-top:20px;border:0;background:var(--ink);color:#fff;padding:15px;border-radius:13px;font-weight:700;cursor:pointer}
+button:disabled{opacity:.45;cursor:not-allowed}.meta{display:flex;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin-top:10px}
+audio{width:100%;margin-top:18px}.status{font-size:13px;color:var(--muted);margin-top:12px;min-height:20px}
+.small{font-size:12px;color:var(--muted);line-height:1.5}.voicegrid{max-height:330px;overflow:auto;border:1px solid var(--line);border-radius:13px;padding:6px}
+.voice{padding:9px 10px;border-radius:9px;cursor:pointer;display:flex;justify-content:space-between;font-size:13px}.voice:hover{background:#f4f2ee}.voice.sel{background:#ece9ff}
+@media(max-width:850px){main{grid-template-columns:1fr}.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+ <div><h1>Podcast Studio</h1><p>Convierte tus apuntes en audio para estudiar escuchando.</p></div>
+ <div class="badge">100% local · sin API</div>
+</header>
+<main>
+<section class="card">
+ <div class="drop" id="drop">
+   <strong>Sube tu material</strong><br>
+   <span class="small">TXT · Markdown · PDF · DOCX</span>
+   <input id="file" type="file" accept=".txt,.md,.markdown,.pdf,.docx" hidden>
+ </div>
+ <label>Texto</label>
+ <textarea id="text" placeholder="Pega aquí tus apuntes o sube un documento..."></textarea>
+ <div class="meta"><span id="chars">0 caracteres</span><span id="chunks">0 segmentos</span></div>
+</section>
+
+<aside class="card">
+ <label>Voz</label>
+ <select id="voice"></select>
+ <div class="small" style="margin-top:7px">Kokoro-82M · voces oficiales · Apache-2.0</div>
+
+ <label>Perfil de narración</label>
+ <div class="profile">
+  <button data-speed=".88" data-name="study" class="active">📚 Estudio<br><span class="small">pausado y claro</span></button>
+  <button data-speed=".95" data-name="podcast">🎙 Podcast<br><span class="small">natural y fluido</span></button>
+  <button data-speed=".82" data-name="lecture">🎓 Cátedra<br><span class="small">muy articulado</span></button>
+  <button data-speed="1.02" data-name="energetic">⚡ Energético<br><span class="small">más dinámico</span></button>
+  <button data-speed=".78" data-name="calm">🌙 Calmado<br><span class="small">repaso nocturno</span></button>
+  <button data-speed="1.08" data-name="review">🔁 Repaso<br><span class="small">rápido</span></button>
+ </div>
+
+ <label>Velocidad <span id="speedLabel">0.88×</span></label>
+ <input id="speed" type="range" min=".65" max="1.20" step=".01" value=".88">
+
+ <label>Catálogo de voces</label>
+ <div class="voicegrid" id="voicegrid"></div>
+
+ <button class="primary" id="generate">Crear podcast</button>
+ <div class="status" id="status"></div>
+ <audio id="audio" controls hidden></audio>
+</aside>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+let voices=[], profile='study';
+async function init(){
+ const r=await fetch('/api/voices'); const d=await r.json(); voices=d.voices;
+ const select=$('#voice');
+ voices.forEach(v=>{let o=document.createElement('option');o.value=v.id;o.textContent=`${v.id} · ${v.language} · ${v.style}`;select.appendChild(o)});
+ select.value='ef_dora'; renderVoices();
+}
+function renderVoices(){
+ const q=$('#voice').value; $('#voicegrid').innerHTML='';
+ voices.forEach(v=>{let el=document.createElement('div');el.className='voice '+(v.id===q?'sel':'');el.innerHTML=`<span>${v.id}</span><span>${v.language} · ${v.style}</span>`;el.onclick=()=>{$('#voice').value=v.id;renderVoices()};$('#voicegrid').appendChild(el)})
+}
+$('#voice').onchange=renderVoices;
+$('#drop').onclick=()=>$('#file').click();
+$('#file').onchange=async e=>{if(!e.target.files[0])return; let fd=new FormData();fd.append('file',e.target.files[0]);$('#status').textContent='Leyendo documento…';let r=await fetch('/api/extract',{method:'POST',body:fd});let d=await r.json();if(d.error){$('#status').textContent=d.error;return}$('#text').value=d.text;updateMeta();$('#status').textContent='Documento cargado.'};
+$('#text').oninput=updateMeta;
+function updateMeta(){let t=$('#text').value;$('#chars').textContent=t.length.toLocaleString('es-CL')+' caracteres';$('#chunks').textContent=Math.max(0,Math.ceil(t.length/900))+' segmentos aprox.'}
+document.querySelectorAll('.profile button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.profile button').forEach(x=>x.classList.remove('active'));b.classList.add('active');profile=b.dataset.name;$('#speed').value=b.dataset.speed;$('#speedLabel').textContent=Number(b.dataset.speed).toFixed(2)+'×'});
+$('#speed').oninput=e=>$('#speedLabel').textContent=Number(e.target.value).toFixed(2)+'×';
+$('#generate').onclick=async()=>{
+ const text=$('#text').value.trim(); if(!text){$('#status').textContent='Agrega texto primero.';return}
+ $('#generate').disabled=true;$('#status').textContent='Generando audio localmente… Esto puede tardar según tu Mac.';
+ let fd=new FormData();fd.append('text',text);fd.append('voice',$('#voice').value);fd.append('speed',$('#speed').value);fd.append('profile',profile);
+ try{let r=await fetch('/api/generate',{method:'POST',body:fd});if(!r.ok){let d=await r.json();throw new Error(d.error||'Error generando audio')}let blob=await r.blob();let url=URL.createObjectURL(blob);$('#audio').src=url;$('#audio').hidden=false;$('#audio').play().catch(()=>{});$('#status').textContent='Podcast listo.'}
+ catch(e){$('#status').textContent=e.message}
+ finally{$('#generate').disabled=false}
+}
+init();updateMeta();
+</script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+audio/
+uploads/
+*.wav
+*.mp3
+
+# Modelos locales
+models/
+*.pt
+*.pth
+*.bin
+*.safetensors
+
+# Entorno Python
+.venv/
+__pycache__/
+*.pyc
+
+# Audio generado localmente
+*.wav
+*.mp3
+*.m4a
+*.flac
+
+# Variables de entorno
+.env
+backend/.env
+
+# Archivos temporales
+runtime/
+backend/runtime/

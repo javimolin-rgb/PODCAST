@@ -1,9 +1,7 @@
-
 from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import soundfile as sf
@@ -12,6 +10,10 @@ from kokoro_onnx import Kokoro
 from misaki.espeak import EspeakG2P
 
 
+# ============================================================
+# RUTAS
+# ============================================================
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 MODEL_DIR = BASE_DIR / "models"
 
@@ -19,6 +21,11 @@ MODEL_PATH = MODEL_DIR / "kokoro-v1.0.int8.onnx"
 VOICES_PATH = MODEL_DIR / "voices-v1.0.bin"
 
 SAMPLE_RATE = 24000
+
+
+# ============================================================
+# IDIOMAS POR PREFIJO DE VOZ
+# ============================================================
 
 LANGUAGES = {
     "af": "en-us",
@@ -40,6 +47,10 @@ LANGUAGES = {
     "zm": "zh",
 }
 
+
+# ============================================================
+# VOCES DISPONIBLES
+# ============================================================
 
 ALL_VOICES = {
     "af_heart",
@@ -99,64 +110,117 @@ ALL_VOICES = {
 }
 
 
+# ============================================================
+# VALIDACIONES
+# ============================================================
+
 def validate_model_files():
+    """
+    Comprueba que el modelo ONNX y el archivo de voces existan.
+    """
     if not MODEL_PATH.exists():
         raise FileNotFoundError(
-            f"Kokoro ONNX model not found: {MODEL_PATH}"
+            "No se encontró el modelo Kokoro ONNX: "
+            f"{MODEL_PATH}"
         )
 
     if not VOICES_PATH.exists():
         raise FileNotFoundError(
-            f"Kokoro voice pack not found: {VOICES_PATH}"
+            "No se encontró el archivo de voces Kokoro: "
+            f"{VOICES_PATH}"
         )
 
 
 def get_language_for_voice(voice: str) -> str:
+    """
+    Obtiene el idioma a partir del prefijo de la voz.
+    """
     if not voice or "_" not in voice:
-        raise ValueError(f"Invalid Kokoro voice: {voice}")
+        raise ValueError(
+            f"Voz Kokoro no válida: {voice}"
+        )
 
     prefix = voice.split("_", 1)[0]
 
     if prefix not in LANGUAGES:
-        raise ValueError(f"Unsupported Kokoro voice language: {voice}")
+        raise ValueError(
+            f"Idioma no compatible para la voz: {voice}"
+        )
 
     return LANGUAGES[prefix]
 
 
 def validate_voice(voice: str):
+    """
+    Comprueba que la voz solicitada exista en la lista permitida.
+    """
     if voice not in ALL_VOICES:
         raise ValueError(
-            f"Unknown Kokoro voice '{voice}'. "
-            f"Available voices: {len(ALL_VOICES)}"
+            f"Voz Kokoro desconocida: '{voice}'. "
+            f"Voces disponibles: {len(ALL_VOICES)}"
         )
 
 
+# ============================================================
+# CARGA DEL MOTOR ONNX
+# ============================================================
+
 @lru_cache(maxsize=1)
 def get_kokoro() -> Kokoro:
+    """
+    Carga el modelo ONNX una sola vez por proceso.
+    """
     validate_model_files()
 
-    print("[KOKORO-ONNX] Loading INT8 model...")
-    print(f"[KOKORO-ONNX] Model: {MODEL_PATH}")
-    print(f"[KOKORO-ONNX] Voices: {VOICES_PATH}")
+    print(
+        "[KOKORO-ONNX] Cargando modelo INT8..."
+    )
+
+    print(
+        f"[KOKORO-ONNX] Modelo: {MODEL_PATH}"
+    )
+
+    print(
+        f"[KOKORO-ONNX] Voces: {VOICES_PATH}"
+    )
 
     engine = Kokoro(
         str(MODEL_PATH),
         str(VOICES_PATH),
     )
 
-    print("[KOKORO-ONNX] Engine ready.")
+    print(
+        "[KOKORO-ONNX] Motor listo."
+    )
 
     return engine
 
 
 @lru_cache(maxsize=8)
 def get_g2p(language: str):
-    print(f"[KOKORO-ONNX] Loading G2P: {language}")
+    """
+    Carga y conserva el conversor texto-fonemas por idioma.
+    """
+    print(
+        f"[KOKORO-ONNX] Cargando G2P: {language}"
+    )
 
-    return EspeakG2P(language=language)
+    return EspeakG2P(
+        language=language
+    )
 
 
-def phonemize(text: str, language: str) -> str:
+# ============================================================
+# FONEMIZACION
+# ============================================================
+
+def phonemize(
+    text: str,
+    language: str,
+) -> str:
+    """
+    Convierte texto a fonemas.
+    """
     g2p = get_g2p(language)
 
     phonemes, _ = g2p(text)
@@ -164,32 +228,41 @@ def phonemize(text: str, language: str) -> str:
     return phonemes
 
 
+# ============================================================
+# GENERACION DE AUDIO
+# ============================================================
+
 def generate_audio(
     text: str,
     voice: str = "ef_dora",
     speed: float = 1.0,
 ) -> np.ndarray:
-
+    """
+    Genera audio utilizando Kokoro ONNX.
+    """
     validate_voice(voice)
 
     if not text or not text.strip():
-        raise ValueError("Text cannot be empty.")
+        raise ValueError(
+            "El texto no puede estar vacío."
+        )
 
-    language = get_language_for_voice(voice)
+    language = get_language_for_voice(
+        voice
+    )
 
     speed = float(speed)
 
     if speed <= 0:
         speed = 1.0
 
-    if speed < 0.5:
-        speed = 0.5
-
-    if speed > 2.0:
-        speed = 2.0
+    speed = max(
+        0.5,
+        min(2.0, speed),
+    )
 
     print(
-        f"[KOKORO-ONNX] Generating | "
+        "[KOKORO-ONNX] Generando audio | "
         f"voice={voice} | "
         f"language={language} | "
         f"speed={speed} | "
@@ -205,7 +278,7 @@ def generate_audio(
 
     if not phonemes:
         raise RuntimeError(
-            "Kokoro phonemization returned empty output."
+            "La fonemización de Kokoro devolvió un resultado vacío."
         )
 
     samples, sample_rate = engine.create(
@@ -217,11 +290,14 @@ def generate_audio(
 
     if sample_rate != SAMPLE_RATE:
         print(
-            f"[KOKORO-ONNX] Warning: "
-            f"sample rate returned: {sample_rate}"
+            "[KOKORO-ONNX] Advertencia: "
+            f"frecuencia recibida: {sample_rate}"
         )
 
-    return np.asarray(samples, dtype=np.float32)
+    return np.asarray(
+        samples,
+        dtype=np.float32,
+    )
 
 
 def generate_to_wav(
@@ -230,8 +306,15 @@ def generate_to_wav(
     speed: float,
     output: Path,
 ):
+    """
+    Genera audio y lo guarda como WAV PCM16.
+    """
     output = Path(output)
-    output.parent.mkdir(parents=True, exist_ok=True)
+
+    output.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     audio = generate_audio(
         text=text,
@@ -239,15 +322,19 @@ def generate_to_wav(
         speed=speed,
     )
 
-    sf.write(
-        str(output),
-        audio,
-        SAMPLE_RATE,
-        subtype="PCM_16",
-    )
+    try:
+        sf.write(
+            str(output),
+            audio,
+            SAMPLE_RATE,
+            subtype="PCM_16",
+        )
+    finally:
+        # Libera explícitamente el array de audio.
+        del audio
 
     print(
-        f"[KOKORO-ONNX] Audio saved: "
+        "[KOKORO-ONNX] Audio guardado: "
         f"{output} "
         f"({output.stat().st_size / 1024:.1f} KB)"
     )
@@ -255,11 +342,21 @@ def generate_to_wav(
     return output
 
 
+# ============================================================
+# INFORMACION DEL MOTOR
+# ============================================================
+
 def list_voices():
+    """
+    Devuelve las voces disponibles.
+    """
     return sorted(ALL_VOICES)
 
 
 def health():
+    """
+    Devuelve información de diagnóstico del motor.
+    """
     return {
         "engine": "kokoro-onnx",
         "model": "kokoro-v1.0.int8.onnx",

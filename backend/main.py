@@ -4,6 +4,7 @@ import uuid
 import shutil
 import asyncio
 from pathlib import Path
+from backend.kokoro_engine import health as kokoro_health
 from typing import Optional
 
 import httpx
@@ -166,18 +167,19 @@ async def elevenlabs_tts(text: str, voice_id: str, speed: float, output: Path):
 
 
 async def kokoro_tts(text: str, voice: str, speed: float, output: Path):
-    if not settings.kokoro_api_url:
-        raise RuntimeError("KOKORO_API_URL no está configurado.")
-    url = settings.kokoro_api_url.rstrip("/") + "/tts"
-    headers = {}
-    if settings.kokoro_api_key:
-        headers["Authorization"] = f"Bearer {settings.kokoro_api_key}"
-    payload = {"text": text, "voice": voice, "speed": speed, "format": "mp3"}
-    async with httpx.AsyncClient(timeout=180) as client:
-        r = await client.post(url, json=payload, headers=headers)
-        if r.status_code >= 400:
-            raise RuntimeError(f"Kokoro: {r.status_code} {r.text[:500]}")
-        output.write_bytes(r.content)
+    """
+    Genera audio directamente con Kokoro-82M.
+    
+    No utiliza KOKORO_API_URL ni ninguna API externa.
+    """
+    from backend.kokoro_engine import generate_to_wav
+
+    generate_to_wav(
+        text=text,
+        voice=voice,
+        speed=speed,
+        output=output,
+    )
 
 
 async def generate_job(job_id: str, text: str, profile: str, voice: str, provider: str, speed: float, split_chapters: bool):
@@ -199,7 +201,8 @@ async def generate_job(job_id: str, text: str, profile: str, voice: str, provide
 
             for chunk_index, chunk in enumerate(chunks):
                 job["message"] = f"Generando {title} · segmento {chunk_index+1}/{len(chunks)}"
-                part = chapter_dir / f"part_{chapter_index}_{chunk_index}.mp3"
+                extension = "mp3" if provider == "elevenlabs" else "wav"
+                part = chapter_dir / f"part_{chapter_index}_{chunk_index}.{extension}"
                 if provider == "elevenlabs":
                     await elevenlabs_tts(chunk, voice, speed, part)
                 elif provider == "kokoro":
@@ -212,7 +215,8 @@ async def generate_job(job_id: str, text: str, profile: str, voice: str, provide
 
             # MP3 concatenation without transcoding requires compatible streams.
             # For maximum compatibility we use ffmpeg when available.
-            final = chapter_dir / f"chapter_{chapter_index}.mp3"
+            extension = "mp3" if provider == "elevenlabs" else "wav"
+            final = chapter_dir / f"chapter_{chapter_index}.{extension}"
             concat_file = chapter_dir / f"concat_{chapter_index}.txt"
             concat_file.write_text(
                 "\n".join(f"file '{p.name}'" for p in audio_parts),
@@ -238,8 +242,12 @@ async def generate_job(job_id: str, text: str, profile: str, voice: str, provide
             })
 
         # Combined file for download-all.
-        chapter_files = [JOBS / job_id / f"chapter_{i}.mp3" for i in range(len(result))]
-        combined = JOBS / job_id / "podcast.mp3"
+        extension = "mp3" if provider == "elevenlabs" else "wav"
+        chapter_files = [
+            JOBS / job_id / f"chapter_{i}.{extension}"
+            for i in range(len(result))
+        ]
+        combined = JOBS / job_id / f"podcast.{extension}"
         concat_all = JOBS / job_id / "concat_all.txt"
         concat_all.write_text(
             "\n".join(f"file '{p.name}'" for p in chapter_files),
@@ -274,7 +282,7 @@ async def health():
         "status": "ok",
         "providers": {
             "elevenlabs": bool(settings.elevenlabs_api_key),
-            "kokoro": bool(settings.kokoro_api_url),
+            "kokoro": True,
         },
     }
 
@@ -286,7 +294,7 @@ async def create_podcast(
     text: str = Form(""),
     profile: str = Form("study"),
     voice: str = Form("ef_dora"),
-    provider: str = Form("elevenlabs"),
+    provider: str = Form("kokoro"),
     speed: float = Form(1.0),
     split_chapters: bool = Form(True),
 ):
@@ -352,4 +360,15 @@ async def audio(job_id: str, filename: str):
     path = JOBS / job_id / safe
     if not path.exists():
         raise HTTPException(404, "Audio no encontrado.")
-    return FileResponse(path, media_type="audio/mpeg", filename=safe)
+    media_type = {
+        ".mp3": "audio/mpeg",
+        ".wav": "audio/wav",
+        ".m4a": "audio/mp4",
+        ".ogg": "audio/ogg",
+    }.get(path.suffix.lower(), "application/octet-stream")
+
+    return FileResponse(
+        path,
+        media_type=media_type,
+        filename=safe,
+    )

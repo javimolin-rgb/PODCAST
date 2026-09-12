@@ -166,19 +166,24 @@ async def elevenlabs_tts(text: str, voice_id: str, speed: float, output: Path):
         output.write_bytes(r.content)
 
 
-async def kokoro_tts(text: str, voice: str, speed: float, output: Path):
+async def kokoro_tts(
+    text: str,
+    voice: str,
+    speed: float,
+    output: Path,
+):
     """
-    Genera audio directamente con Kokoro-82M.
-    
-    No utiliza KOKORO_API_URL ni ninguna API externa.
+    Genera audio con Kokoro ONNX sin utilizar una API externa.
+    La ejecución se realiza en un hilo para no bloquear FastAPI.
     """
     from backend.kokoro_engine import generate_to_wav
 
-    generate_to_wav(
-        text=text,
-        voice=voice,
-        speed=speed,
-        output=output,
+    await asyncio.to_thread(
+        generate_to_wav,
+        text,
+        voice,
+        speed,
+        output,
     )
 
 

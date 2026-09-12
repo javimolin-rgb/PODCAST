@@ -9,5 +9,5 @@ pydantic-settings>=2.6,<3
 kokoro-onnx==0.6.1
 onnxruntime>=1.20,<2
 soundfile==0.14.0
-numpy>=1.26,<2
+numpy>=2.0.2,<3
 misaki>=0.9.4

@@ -64,10 +64,114 @@ textInput.addEventListener("input", updateCount);
 
 $("speed").addEventListener("input", e => $("speedValue").textContent = `${Number(e.target.value).toFixed(2)}×`);
 
+// ============================================================
+// SISTEMA DE VOCES
+// ============================================================
+
+const KOKORO_VOICES = [
+  ["af_heart", "Heart", "Inglés · EE.UU."],
+  ["af_alloy", "Alloy", "Inglés · EE.UU."],
+  ["af_aoede", "Aoede", "Inglés · EE.UU."],
+  ["af_bella", "Bella", "Inglés · EE.UU."],
+  ["af_jessica", "Jessica", "Inglés · EE.UU."],
+  ["af_kore", "Kore", "Inglés · EE.UU."],
+  ["af_nicole", "Nicole", "Inglés · EE.UU."],
+  ["af_nova", "Nova", "Inglés · EE.UU."],
+  ["af_river", "River", "Inglés · EE.UU."],
+  ["af_sarah", "Sarah", "Inglés · EE.UU."],
+  ["af_sky", "Sky", "Inglés · EE.UU."],
+
+  ["am_adam", "Adam", "Inglés · EE.UU."],
+  ["am_echo", "Echo", "Inglés · EE.UU."],
+  ["am_eric", "Eric", "Inglés · EE.UU."],
+  ["am_fenrir", "Fenrir", "Inglés · EE.UU."],
+  ["am_liam", "Liam", "Inglés · EE.UU."],
+  ["am_michael", "Michael", "Inglés · EE.UU."],
+  ["am_onyx", "Onyx", "Inglés · EE.UU."],
+  ["am_puck", "Puck", "Inglés · EE.UU."],
+  ["am_santa", "Santa", "Inglés · EE.UU."],
+
+  ["bf_alice", "Alice", "Inglés · Reino Unido"],
+  ["bf_emma", "Emma", "Inglés · Reino Unido"],
+  ["bf_isabella", "Isabella", "Inglés · Reino Unido"],
+  ["bf_lily", "Lily", "Inglés · Reino Unido"],
+  ["bm_daniel", "Daniel", "Inglés · Reino Unido"],
+  ["bm_fable", "Fable", "Inglés · Reino Unido"],
+  ["bm_george", "George", "Inglés · Reino Unido"],
+  ["bm_lewis", "Lewis", "Inglés · Reino Unido"],
+
+  ["ef_dora", "Dora", "Español"],
+  ["em_alex", "Alex", "Español"],
+  ["em_santa", "Santa", "Español"],
+
+  ["ff_siwis", "Siwis", "Francés"],
+
+  ["hf_alpha", "Alpha", "Hindi"],
+  ["hf_beta", "Beta", "Hindi"],
+  ["hm_omega", "Omega", "Hindi"],
+  ["hm_psi", "Psi", "Hindi"],
+
+  ["if_sara", "Sara", "Italiano"],
+  ["im_nicola", "Nicola", "Italiano"],
+
+  ["jf_alpha", "Alpha", "Japonés"],
+  ["jf_gongitsune", "Gongitsune", "Japonés"],
+  ["jf_nezumi", "Nezumi", "Japonés"],
+  ["jf_tebukuro", "Tebukuro", "Japonés"],
+  ["jm_kumo", "Kumo", "Japonés"],
+
+  ["pf_dora", "Dora", "Portugués · Brasil"],
+  ["pm_alex", "Alex", "Portugués · Brasil"],
+  ["pm_santa", "Santa", "Portugués · Brasil"],
+
+  ["zf_xiaobei", "Xiaobei", "Mandarín"],
+  ["zf_xiaoni", "Xiaoni", "Mandarín"],
+  ["zf_xiaoxiao", "Xiaoxiao", "Mandarín"],
+  ["zf_xiaoyi", "Xiaoyi", "Mandarín"],
+  ["zm_yunjian", "Yunjian", "Mandarín"],
+  ["zm_yunxi", "Yunxi", "Mandarín"],
+  ["zm_yunxia", "Yunxia", "Mandarín"],
+  ["zm_yunyang", "Yunyang", "Mandarín"]
+];
+
+const ELEVENLABS_VOICES = [
+  ["EXAVITQu4vr4xnSDxMaL", "Bella", "ElevenLabs"],
+  ["21m00Tcm4TlvDq8ikWAM", "Rachel", "ElevenLabs"]
+];
+
+function populateVoices(provider, preferredVoice = null) {
+  const select = $("voice");
+
+  const voices = provider === "kokoro"
+    ? KOKORO_VOICES
+    : ELEVENLABS_VOICES;
+
+  select.innerHTML = "";
+
+  voices.forEach(([id, name, language]) => {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = `${name} · ${language}`;
+    select.appendChild(option);
+  });
+
+  const validPreferred = voices.some(([id]) => id === preferredVoice);
+
+  if (validPreferred) {
+    select.value = preferredVoice;
+  } else if (provider === "kokoro") {
+    select.value = "ef_dora";
+  } else {
+    select.value = "EXAVITQu4vr4xnSDxMaL";
+  }
+}
+
 $("provider").addEventListener("change", () => {
-  const p = $("provider").value;
-  $("voice").value = p === "kokoro" ? "ef_dora" : "EXAVITQu4vr4xnSDxMaL";
+  populateVoices($("provider").value);
 });
+
+// Kokoro + Dora como configuración inicial
+populateVoices("kokoro", "ef_dora");
 
 async function createPodcast(){
   clearError();

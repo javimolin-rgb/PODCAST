@@ -33,3 +33,7 @@ backend/.env
 # Archivos temporales
 runtime/
 backend/runtime/
+
+# Kokoro ONNX model files
+models/*.onnx
+models/*.bin
